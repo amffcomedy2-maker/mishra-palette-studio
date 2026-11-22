@@ -45,9 +45,10 @@ function useLiveContent() {
     if (!rt) return;
     let channel: ReturnType<typeof rt.channel> | null = null;
     try {
+      // Shared public broadcast room; the database trigger sends a data-free "changed" event.
       channel = rt
-        .channel(`content-${Math.random().toString(36).slice(2)}`)
-        .on("postgres_changes", { event: "*", schema: "public", table: "content_version" }, () => {
+        .channel("site-content")
+        .on("broadcast", { event: "changed" }, () => {
           void qc.invalidateQueries({ queryKey: ["public-data"] });
         })
         .subscribe();

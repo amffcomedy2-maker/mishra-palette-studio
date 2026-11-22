@@ -32,7 +32,7 @@ use the editor.
 ## Project rules
 - Admin access is a server-verified PIN (PBKDF2 hash in `admin_auth`) that issues an HMAC-signed session token (`ADMIN_SESSION_SECRET`); every admin server function/route calls `requireAdmin(token)` — the panel has no Supabase auth users by design.
 - Private tables (`api_integrations`, `admin_auth`, `login_attempts`, `translation_cache`) have no anon/authenticated grants; only server code with the service role touches them, so API keys never reach the browser.
-- Public pages read visible `posts` (anon RLS) and `site_settings` (no anon grant; server key, card columns only) via `getPublicData`; live updates come from a realtime subscription on the single-row `content_version` table bumped by triggers (RLS hides hidden posts from realtime payloads).
+- Public pages read visible `posts` (anon RLS) and `site_settings` (no anon grant; server key, card columns only) via `getPublicData`; live updates are a data-free `realtime.send` broadcast (`site-content` topic, `changed` event) from the `bump_content_version` trigger; `content_version` itself has no anon grant.
 - Third-party API keys (ImgBB, Cloudinary, Gemini, custom webhooks) are managed by the admin in the database, not project secrets; failover order comes from `orderActiveIntegrations`.
 - Translation uses admin-added Gemini keys first and falls back to the Lovable AI Gateway; results are cached in `translation_cache`. Wrap visible text in `useT()`'s `t()`.
 - The visiting card uses only fixed `vc-*` tokens (no color-mix/backdrop-filter) so html2canvas-pro renders the PNG identically in both themes.
