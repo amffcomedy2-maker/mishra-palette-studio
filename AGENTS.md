@@ -37,3 +37,4 @@ use the editor.
 - Translation uses admin-added Gemini keys first and falls back to the Lovable AI Gateway; results are cached in `translation_cache`. Wrap visible text in `useT()`'s `t()`.
 - The visiting card uses only fixed `vc-*` tokens (no color-mix/backdrop-filter) so html2canvas-pro renders the PNG identically in both themes.
 - Facebook embeds store only a validated `www.facebook.com/plugins/...` iframe src, never raw pasted HTML.
+- No `attachSupabaseAuth` in `src/start.ts` and no generated browser Supabase client on public pages: both read localStorage, which throws when storage is blocked (iframes/private mode) and blanks the site; realtime uses the storage-free `getRealtimeClient()`.

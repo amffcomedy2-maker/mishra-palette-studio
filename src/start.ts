@@ -1,7 +1,6 @@
 import { createStart, createCsrfMiddleware, createMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
-import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
@@ -31,7 +30,10 @@ const csrfMiddleware = createCsrfMiddleware({
 // requireSupabaseAuth server functions need. Add it by hand only if Lovable Cloud or a
 // user-managed Supabase project is connected, no middleware here sets Authorization, and the
 // project did not intentionally replace it.
+// attachSupabaseAuth is intentionally NOT registered: this app has no Supabase auth users
+// (admin uses a PIN token), and its getSession() reads localStorage, which throws a
+// SecurityError and blanks the page when storage is blocked (e.g. inside third-party iframes).
 export const startInstance = createStart(() => ({
-  functionMiddleware: [attachSupabaseAuth],
+  functionMiddleware: [],
   requestMiddleware: [errorMiddleware, csrfMiddleware],
 }));

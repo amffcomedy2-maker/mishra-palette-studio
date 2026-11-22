@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { queryOptions, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getRealtimeClient } from "@/lib/realtime-client";
 import { getPublicData } from "@/lib/public.functions";
 import { CardHero } from "@/components/site/CardHero";
 import { Portfolio } from "@/components/site/Portfolio";
@@ -41,14 +41,21 @@ export const Route = createFileRoute("/")({
 function useLiveContent() {
   const qc = useQueryClient();
   useEffect(() => {
-    const channel = supabase
-      .channel(`content-${Math.random().toString(36).slice(2)}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "content_version" }, () => {
-        void qc.invalidateQueries({ queryKey: ["public-data"] });
-      })
-      .subscribe();
+    const rt = getRealtimeClient();
+    if (!rt) return;
+    let channel: ReturnType<typeof rt.channel> | null = null;
+    try {
+      channel = rt
+        .channel(`content-${Math.random().toString(36).slice(2)}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "content_version" }, () => {
+          void qc.invalidateQueries({ queryKey: ["public-data"] });
+        })
+        .subscribe();
+    } catch {
+      channel = null;
+    }
     return () => {
-      void supabase.removeChannel(channel);
+      if (channel) void rt.removeChannel(channel);
     };
   }, [qc]);
 }
