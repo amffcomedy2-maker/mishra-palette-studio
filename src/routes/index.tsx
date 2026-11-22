@@ -1,23 +1,79 @@
+import { useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { queryOptions, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { getPublicData } from "@/lib/public.functions";
+import { CardHero } from "@/components/site/CardHero";
+import { Portfolio } from "@/components/site/Portfolio";
+import { SiteHeader } from "@/components/site/SiteHeader";
+import { FloatingContact } from "@/components/site/FloatingContact";
+import { useT } from "@/lib/i18n";
 
-// The home route ships no og:image, so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
-export const Route = createFileRoute("/")({
-  component: Index,
+const publicDataQuery = queryOptions({
+  queryKey: ["public-data"],
+  queryFn: () => getPublicData(),
+  staleTime: 15_000,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+export const Route = createFileRoute("/")({
+  loader: ({ context }) => context.queryClient.ensureQueryData(publicDataQuery),
+  head: () => ({
+    meta: [
+      { title: "Mishra Painters — Pro. Amit Mishra | Wall Painting in Gurgaon" },
+      {
+        name: "description",
+        content:
+          "Digital visiting card of Mishra Painters, Sector 105 Gurgaon. Painting, wall putty, plastic paint, royal play, wall texture & furniture polish. Call or WhatsApp now.",
+      },
+      { property: "og:title", content: "Mishra Painters — Pro. Amit Mishra" },
+      {
+        property: "og:description",
+        content:
+          "Painting, wall putty, royal play, wall texture & furniture polish in Gurgaon. See our original work and WhatsApp us.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
+  component: Home,
+});
+
+function useLiveContent() {
+  const qc = useQueryClient();
+  useEffect(() => {
+    const channel = supabase
+      .channel(`content-${Math.random().toString(36).slice(2)}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "content_version" }, () => {
+        void qc.invalidateQueries({ queryKey: ["public-data"] });
+      })
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [qc]);
+}
+
+function Home() {
+  const { data } = useSuspenseQuery(publicDataQuery);
+  const t = useT();
+  useLiveContent();
+  const s = data.settings;
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div id="top" className="min-h-screen">
+      <SiteHeader businessName={s.business_name} />
+      <main>
+        <CardHero settings={s} />
+        <Portfolio posts={data.posts} settings={s} />
+      </main>
+      <footer className="border-t border-border px-4 pb-28 pt-8 text-center text-sm text-muted-foreground">
+        <p className="font-display text-base font-semibold text-gold-gradient">
+          {t(s.business_name)}
+        </p>
+        <p className="mt-1">
+          {t("Pro.")} {t(s.proprietor_name)} · {t(s.address)}
+        </p>
+      </footer>
+      <FloatingContact settings={s} />
     </div>
   );
 }

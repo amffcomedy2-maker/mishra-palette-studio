@@ -10,33 +10,53 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminMishraRouteImport } from './routes/admin-mishra'
+import { Route as ApiAdminUploadImageRouteImport } from './routes/api/admin/upload-image'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminMishraRoute = AdminMishraRouteImport.update({
+  id: '/admin-mishra',
+  path: '/admin-mishra',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminUploadImageRoute = ApiAdminUploadImageRouteImport.update({
+  id: '/api/admin/upload-image',
+  path: '/api/admin/upload-image',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin-mishra': typeof AdminMishraRoute
+  '/api/admin/upload-image': typeof ApiAdminUploadImageRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin-mishra': typeof AdminMishraRoute
+  '/api/admin/upload-image': typeof ApiAdminUploadImageRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin-mishra': typeof AdminMishraRoute
+  '/api/admin/upload-image': typeof ApiAdminUploadImageRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/admin-mishra' | '/api/admin/upload-image'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/admin-mishra' | '/api/admin/upload-image'
+  id: '__root__' | '/' | '/admin-mishra' | '/api/admin/upload-image'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminMishraRoute: typeof AdminMishraRoute
+  ApiAdminUploadImageRoute: typeof ApiAdminUploadImageRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +68,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin-mishra': {
+      id: '/admin-mishra'
+      path: '/admin-mishra'
+      fullPath: '/admin-mishra'
+      preLoaderRoute: typeof AdminMishraRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/upload-image': {
+      id: '/api/admin/upload-image'
+      path: '/api/admin/upload-image'
+      fullPath: '/api/admin/upload-image'
+      preLoaderRoute: typeof ApiAdminUploadImageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminMishraRoute: AdminMishraRoute,
+  ApiAdminUploadImageRoute: ApiAdminUploadImageRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
