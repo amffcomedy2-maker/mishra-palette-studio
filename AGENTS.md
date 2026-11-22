@@ -37,4 +37,7 @@ use the editor.
 - Translation uses admin-added Gemini keys first and falls back to the Lovable AI Gateway; results are cached in `translation_cache`. Wrap visible text in `useT()`'s `t()`.
 - The visiting card uses only fixed `vc-*` tokens (no color-mix/backdrop-filter) so html2canvas-pro renders the PNG identically in both themes.
 - Facebook embeds store only a validated `www.facebook.com/plugins/...` iframe src, never raw pasted HTML.
+- Facebook share links (`/share/*`, `fb.watch`) are resolved server-side by `resolveFacebookUrl` (admin server function, crawler UA first because Facebook 400s browsers; only Facebook hosts fetched) before saving; no Supabase Edge Functions in this TanStack project.
+- An uploaded visiting card (`site_settings.card_image_url`, ImgBB via `/api/admin/upload-card`) fully replaces the designed card publicly, including the download; null restores the designed card.
+- ImgBB connection tests must upload at least a 16x16 image: ImgBB answers 1x1 images with "You have been forbidden to use this website."
 - No `attachSupabaseAuth` in `src/start.ts` and no generated browser Supabase client on public pages: both read localStorage, which throws when storage is blocked (iframes/private mode) and blanks the site; realtime uses the storage-free `getRealtimeClient()`.

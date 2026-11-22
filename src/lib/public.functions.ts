@@ -27,7 +27,7 @@ function publicClient() {
   });
 }
 
-export type PublicData = { settings: SiteSettings; posts: Post[] };
+export type PublicData = { settings: SiteSettings; posts: Post[]; cardImageUrl: string | null };
 
 export const getPublicData = createServerFn({ method: "GET" }).handler(
   async (): Promise<PublicData> => {
@@ -38,7 +38,7 @@ export const getPublicData = createServerFn({ method: "GET" }).handler(
       supabaseAdmin
         .from("site_settings")
         .select(
-          "devotional_header, business_name, proprietor_name, experience_text, services_text, call_number, whatsapp_number, address",
+          "devotional_header, business_name, proprietor_name, experience_text, services_text, call_number, whatsapp_number, address, card_image_url",
         )
         .eq("id", 1)
         .maybeSingle(),
@@ -64,7 +64,7 @@ export const getPublicData = createServerFn({ method: "GET" }).handler(
           address: row.address,
         }
       : DEFAULT_SETTINGS;
-    return { settings, posts: (p.data ?? []) as Post[] };
+    return { settings, posts: (p.data ?? []) as Post[], cardImageUrl: row?.card_image_url ?? null };
   },
 );
 

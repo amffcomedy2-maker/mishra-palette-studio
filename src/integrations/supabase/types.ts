@@ -175,6 +175,7 @@ export type Database = {
           address: string
           business_name: string
           call_number: string
+          card_image_url: string | null
           devotional_header: string
           experience_text: string
           id: number
@@ -187,6 +188,7 @@ export type Database = {
           address?: string
           business_name?: string
           call_number?: string
+          card_image_url?: string | null
           devotional_header?: string
           experience_text?: string
           id?: number
@@ -199,6 +201,7 @@ export type Database = {
           address?: string
           business_name?: string
           call_number?: string
+          card_image_url?: string | null
           devotional_header?: string
           experience_text?: string
           id?: number

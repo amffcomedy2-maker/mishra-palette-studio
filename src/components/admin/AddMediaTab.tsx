@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Clapperboard, Facebook, Film, Loader2, Rocket, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
@@ -12,8 +12,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { adminCloudinaryTargets, adminCreateMedia } from "@/lib/admin.functions";
-import { CATEGORIES, parseFacebookInput, type Category, type Orientation } from "@/lib/site";
+import {
+  adminCloudinaryTargets,
+  adminCreateMedia,
+  adminResolveFacebookUrl,
+} from "@/lib/admin.functions";
+import {
+  CATEGORIES,
+  errorText,
+  isFacebookLinkInput,
+  parseFacebookInput,
+  type Category,
+  type Orientation,
+} from "@/lib/site";
 import { cn } from "@/lib/utils";
 import { Field, Panel, goldBtn, inputLux } from "./ui";
 import { reportError, useAdmin, xhrUpload } from "./admin-context";
@@ -44,7 +55,48 @@ export function AddMediaTab({ cloudinaryCount }: { cloudinaryCount: number | und
   const [progress, setProgress] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const fb = useMemo(() => parseFacebookInput(fbInput), [fbInput]);
+  // Share links from the mobile app (facebook.com/share/…, fb.watch) are resolved on the server
+  // to the final reel/video/post URL before previewing and saving.
+  const [resolved, setResolved] = useState<{ input: string; url: string } | null>(null);
+  const [resolving, setResolving] = useState(false);
+  const [resolveError, setResolveError] = useState("");
+  const needsResolve = isFacebookLinkInput(fbInput);
+  const effectiveInput = resolved && resolved.input === fbInput.trim() ? resolved.url : fbInput;
+  const fb = useMemo(() => parseFacebookInput(effectiveInput), [effectiveInput]);
+
+  const resolveLink = useCallback(
+    async (input: string): Promise<string> => {
+      const clean = input.trim();
+      if (resolved?.input === clean) return resolved.url;
+      setResolving(true);
+      setResolveError("");
+      try {
+        const res = await adminResolveFacebookUrl({ data: { token, url: clean } });
+        setResolved({ input: clean, url: res.url });
+        return res.url;
+      } catch (e) {
+        const msg = errorText(e);
+        if (msg.includes("SESSION_EXPIRED")) reportError(e, logout);
+        setResolveError(msg || "Could not open this Facebook link.");
+        throw e;
+      } finally {
+        setResolving(false);
+      }
+    },
+    [resolved, token, logout],
+  );
+
+  useEffect(() => {
+    if (!needsResolve) {
+      setResolveError("");
+      return;
+    }
+    const clean = fbInput.trim();
+    if (resolved?.input === clean) return;
+    const id = setTimeout(() => void resolveLink(clean).catch(() => {}), 700);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run only when the pasted text changes
+  }, [fbInput, needsResolve]);
   const finalOrientation: Orientation =
     orientation === "auto"
       ? mode === "facebook"
@@ -97,7 +149,11 @@ export function AddMediaTab({ cloudinaryCount }: { cloudinaryCount: number | und
     setBusy(true);
     try {
       if (mode === "facebook") {
-        if (!fb) throw new Error("Paste a valid Facebook reel/post link or embed code.");
+        const finalInput = needsResolve ? await resolveLink(fbInput) : fbInput;
+        const parsed = parseFacebookInput(finalInput);
+        if (!parsed) throw new Error("Paste a valid Facebook reel/post link or embed code.");
+        const fbOrientation: Orientation =
+          orientation === "auto" ? parsed.orientation : orientation;
         await adminCreateMedia({
           data: {
             token,
@@ -106,9 +162,9 @@ export function AddMediaTab({ cloudinaryCount }: { cloudinaryCount: number | und
               title: title.trim(),
               category,
               note: note.trim() || undefined,
-              embed_url: fb.embedUrl,
-              source_url: fb.sourceUrl,
-              orientation: finalOrientation,
+              embed_url: parsed.embedUrl,
+              source_url: parsed.sourceUrl,
+              orientation: fbOrientation,
             },
           },
         });
@@ -186,9 +242,22 @@ export function AddMediaTab({ cloudinaryCount }: { cloudinaryCount: number | und
               className="rounded-xl bg-background/60 font-mono text-xs"
               placeholder="https://www.facebook.com/reel/123456789…"
             />
-            {fbInput && !fb && (
+            {fbInput && !fb && !needsResolve && (
               <p className="text-xs font-medium text-destructive">
                 This doesn't look like a Facebook link or embed code.
+              </p>
+            )}
+            {needsResolve && resolving && (
+              <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Loader2 className="size-3.5 animate-spin" /> Opening Facebook link…
+              </p>
+            )}
+            {needsResolve && !resolving && resolveError && (
+              <p className="text-xs font-medium text-destructive">{resolveError}</p>
+            )}
+            {needsResolve && !resolving && !resolveError && resolved?.input === fbInput.trim() && (
+              <p className="break-all text-xs text-muted-foreground">
+                <span className="font-semibold text-gold">Final link:</span> {resolved.url}
               </p>
             )}
           </Field>
@@ -342,7 +411,7 @@ export function AddMediaTab({ cloudinaryCount }: { cloudinaryCount: number | und
 
         <button
           type="button"
-          disabled={busy || progress !== null}
+          disabled={busy || progress !== null || resolving}
           onClick={() => void publish()}
           className={`${goldBtn} w-full`}
         >

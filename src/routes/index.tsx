@@ -70,7 +70,7 @@ function Home() {
     <div id="top" className="min-h-screen">
       <SiteHeader businessName={s.business_name} />
       <main>
-        <CardHero settings={s} />
+        <CardHero settings={s} cardImageUrl={data.cardImageUrl} />
         <Portfolio posts={data.posts} settings={s} />
       </main>
       <footer className="border-t border-border px-4 pb-28 pt-8 text-center text-sm text-muted-foreground">

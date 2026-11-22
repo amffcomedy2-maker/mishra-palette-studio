@@ -29,15 +29,39 @@ function downloadBlob(blob: Blob, filename: string) {
 const actionBase =
   "btn-3d inline-flex h-13 items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-3 text-sm font-bold sm:text-[15px]";
 
-export function CardHero({ settings }: { settings: SiteSettings }) {
+export function CardHero({
+  settings,
+  cardImageUrl,
+}: {
+  settings: SiteSettings;
+  cardImageUrl: string | null;
+}) {
   const t = useT();
   const cardRef = useRef<HTMLDivElement>(null);
   const tilt = useTilt<HTMLDivElement>(6);
   const [busy, setBusy] = useState(false);
 
   async function downloadCard() {
+    if (busy) return;
+    if (cardImageUrl) {
+      setBusy(true);
+      try {
+        const res = await fetch(cardImageUrl);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        const ext = blob.type.includes("png") ? "png" : blob.type.includes("webp") ? "webp" : "jpg";
+        downloadBlob(blob, `Mishra-Painters-Visiting-Card.${ext}`);
+        toast.success(t("Visiting card downloaded!"));
+      } catch (e) {
+        console.error(e);
+        window.open(cardImageUrl, "_blank", "noopener");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     const el = cardRef.current;
-    if (!el || busy) return;
+    if (!el) return;
     setBusy(true);
     try {
       tilt.reset();
@@ -77,7 +101,16 @@ export function CardHero({ settings }: { settings: SiteSettings }) {
           ref={tilt.ref}
           className="group relative transition-transform duration-300 ease-out will-change-transform"
         >
-          <VisitingCard ref={cardRef} settings={settings} t={t} />
+          {cardImageUrl ? (
+            <img
+              src={cardImageUrl}
+              alt={`${settings.business_name} — ${t("Visiting Card")}`}
+              className="block w-full rounded-[22px] shadow-2xl"
+              fetchPriority="high"
+            />
+          ) : (
+            <VisitingCard ref={cardRef} settings={settings} t={t} />
+          )}
           <div className="tilt-glare pointer-events-none absolute inset-0 rounded-[22px] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
           <div className="animate-sheen pointer-events-none absolute inset-0 rounded-[22px]" />
         </div>

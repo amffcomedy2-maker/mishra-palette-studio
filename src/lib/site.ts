@@ -131,6 +131,70 @@ const FB_HOSTS = [
   "www.fb.com",
 ];
 
+export function isFacebookHost(host: string): boolean {
+  return FB_HOSTS.includes(host.toLowerCase()) || /(^|\.)facebook\.com$/i.test(host);
+}
+
+/** True for share links that must be resolved on the server before embedding. */
+export function isFacebookShareUrl(u: URL): boolean {
+  const host = u.hostname.toLowerCase();
+  return (
+    host.endsWith("fb.watch") ||
+    /^\/share(\/|$)/i.test(u.pathname) ||
+    (host === "l.facebook.com" && u.pathname.startsWith("/l.php"))
+  );
+}
+
+/** A final facebook.com reel/video/post URL that the embed plugin understands. */
+export function isCanonicalFacebookUrl(u: URL): boolean {
+  if (!isFacebookHost(u.hostname) || isFacebookShareUrl(u)) return false;
+  if (u.hostname.toLowerCase().endsWith("fb.watch")) return false;
+  const p = u.pathname;
+  return (
+    /^\/(reel|reels)\/\d+/i.test(p) ||
+    /\/videos\//i.test(p) ||
+    (/^\/watch\/?$/i.test(p) && !!u.searchParams.get("v")) ||
+    /\/posts\//i.test(p) ||
+    /^\/(permalink|story)\.php$/i.test(p) ||
+    /^\/photo(\.php)?\/?$/i.test(p) ||
+    /\/photos\//i.test(p)
+  );
+}
+
+const KEEP_PARAMS = ["v", "story_fbid", "id", "fbid", "set"];
+
+/** www.facebook.com URL with tracking parameters (mibextid, rdid, share_url, …) removed. */
+export function cleanFacebookUrl(input: URL): string {
+  const u = new URL(input.toString());
+  u.protocol = "https:";
+  if (/(^|\.)facebook\.com$/i.test(u.hostname) || /(^|\.)fb\.com$/i.test(u.hostname))
+    u.hostname = "www.facebook.com";
+  const kept = new URLSearchParams();
+  for (const k of KEEP_PARAMS) {
+    const v = u.searchParams.get(k);
+    if (v) kept.set(k, v);
+  }
+  u.search = kept.toString();
+  u.hash = "";
+  return u.toString();
+}
+
+/** True when the text is a plain Facebook link (not an <iframe> embed code). */
+export function isFacebookLinkInput(input: string): boolean {
+  const raw = (input || "").trim();
+  if (!raw || /<iframe/i.test(raw) || /\s/.test(raw)) return false;
+  try {
+    const u = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    return isFacebookHost(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+export function errorText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e ?? "");
+}
+
 export type FacebookEmbed = {
   embedUrl: string;
   sourceUrl: string;
@@ -202,12 +266,12 @@ export function parseFacebookInput(input: string): FacebookEmbed | null {
   } catch {
     return null;
   }
-  if (!FB_HOSTS.includes(u.hostname.toLowerCase())) return null;
-  if (/(^|\.)facebook\.com$/i.test(u.hostname) || /(^|\.)fb\.com$/i.test(u.hostname))
-    u.hostname = "www.facebook.com";
+  if (!isFacebookHost(u.hostname)) return null;
+  if (!isFacebookShareUrl(u)) u = new URL(cleanFacebookUrl(u));
+  else if (/(^|\.)facebook\.com$/i.test(u.hostname)) u.hostname = "www.facebook.com";
   u.protocol = "https:";
   const isVideo = isVideoPath(u);
-  const isReel = /\/(reel|reels|share\/r)\//i.test(u.pathname) || u.hostname.endsWith("fb.watch");
+  const isReel = /\/(reel|reels|share\/r)(\/|$)/i.test(u.pathname) || u.hostname.endsWith("fb.watch");
   const href = encodeURIComponent(u.toString());
   const embedUrl = isVideo
     ? `https://www.facebook.com/plugins/video.php?href=${href}&show_text=false&width=560&t=0`

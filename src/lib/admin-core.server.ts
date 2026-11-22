@@ -226,8 +226,9 @@ export async function uploadToImgbb(
   throw new UserError(`Upload failed on all ImgBB keys. ${failed.join(" | ")}`);
 }
 
+// 32x32 test picture: ImgBB rejects 1x1 images with "You have been forbidden to use this website."
 const TINY_PNG =
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+  "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAPklEQVR42mPkFlRgoCVgYqAxGLVg1ALKAQsuiZPzxEk1yzzp5WgcjFowasGoBaMWjFqAHTCONrxGLRj8FgAAxB4DuWCKW/AAAAAASUVORK5CYII=";
 
 export async function testIntegration(
   service: ServiceType,
@@ -473,4 +474,80 @@ export async function translateBatch(
   rows.forEach((r) => (result[r.source] = r.translated));
   await supabaseAdmin.from("translation_cache").upsert(rows);
   return result;
+}
+
+/* ---------- Facebook share-link resolver ---------- */
+
+const CRAWLER_UA = "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)";
+const BROWSER_UA =
+  "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36";
+
+/**
+ * Follows a Facebook share link (facebook.com/share/..., fb.watch, m.facebook.com, …) on the
+ * server and returns the final canonical facebook.com URL. Only Facebook hosts are ever fetched.
+ */
+export async function resolveFacebookUrl(raw: string): Promise<{ url: string; resolved: boolean }> {
+  const { isFacebookHost, isCanonicalFacebookUrl, cleanFacebookUrl } = await import("@/lib/site");
+  let start: URL;
+  try {
+    start = new URL(/^https?:\/\//i.test(raw.trim()) ? raw.trim() : `https://${raw.trim()}`);
+  } catch {
+    throw new UserError("This is not a valid link.");
+  }
+  if (!isFacebookHost(start.hostname)) throw new UserError("Please paste a Facebook link.");
+  start.protocol = "https:";
+  if (isCanonicalFacebookUrl(start)) return { url: cleanFacebookUrl(start), resolved: false };
+
+  // Facebook only redirects share links for its own link-preview crawler; a browser UA gets 400.
+  let current = start;
+  for (const ua of [CRAWLER_UA, BROWSER_UA]) {
+    current = start;
+    for (let hop = 0; hop < 8; hop++) {
+      let res: Response;
+      try {
+        res = await fetch(current.toString(), {
+          redirect: "manual",
+          headers: { "User-Agent": ua, "Accept-Language": "en-US,en;q=0.9" },
+          signal: AbortSignal.timeout(10000),
+        });
+      } catch {
+        break;
+      }
+      const loc = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
+      void res.body?.cancel();
+      if (!loc) break;
+      let next: URL;
+      try {
+        next = new URL(loc, current);
+      } catch {
+        break;
+      }
+      if (!isFacebookHost(next.hostname) || /^\/(login|checkpoint)/i.test(next.pathname)) break;
+      current = next;
+      if (isCanonicalFacebookUrl(current)) return { url: cleanFacebookUrl(current), resolved: true };
+    }
+  }
+
+  // Facebook sometimes answers share links with a page instead of a redirect: read its canonical URL.
+  try {
+    const res = await fetch(start.toString(), {
+      headers: { "User-Agent": CRAWLER_UA, "Accept-Language": "en-US,en;q=0.9" },
+      signal: AbortSignal.timeout(10000),
+    });
+    const html = (await res.text()).slice(0, 400_000);
+    const found =
+      html.match(/<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i)?.[1] ??
+      html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i)?.[1];
+    if (found) {
+      const u = new URL(found.replace(/&amp;/g, "&"));
+      if (isFacebookHost(u.hostname) && isCanonicalFacebookUrl(u))
+        return { url: cleanFacebookUrl(u), resolved: true };
+    }
+  } catch {
+    /* fall through */
+  }
+  if (isCanonicalFacebookUrl(current)) return { url: cleanFacebookUrl(current), resolved: true };
+  throw new UserError(
+    "Could not open this Facebook link. Make sure the reel/post is Public, or copy the link from the browser instead.",
+  );
 }

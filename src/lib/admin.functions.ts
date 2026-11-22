@@ -221,6 +221,44 @@ export const adminDeletePost = createServerFn({ method: "POST" })
     }
   });
 
+/* ---------- Facebook link resolver ---------- */
+
+/** Follows a Facebook share link on the server and returns the final canonical URL. */
+export const adminResolveFacebookUrl = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ token, url: z.string().trim().min(4).max(2000) }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const c = await core();
+    try {
+      await c.requireAdmin(data.token);
+      return await c.resolveFacebookUrl(data.url);
+    } catch (e) {
+      fail(e, c.UserError);
+    }
+  });
+
+/* ---------- Uploaded visiting card ---------- */
+
+/** Removes the uploaded card picture so the designed visiting card shows again. */
+export const adminClearCardImage = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ token }).parse(i))
+  .handler(async ({ data }) => {
+    const c = await core();
+    try {
+      await c.requireAdmin(data.token);
+      const sb = await admin();
+      const { error } = await sb
+        .from("site_settings")
+        .update({ card_image_url: null, updated_at: new Date().toISOString() })
+        .eq("id", 1);
+      if (error) throw new Error(error.message);
+      return { ok: true };
+    } catch (e) {
+      fail(e, c.UserError);
+    }
+  });
+
 /* ---------- API integrations ---------- */
 
 export type AdminIntegration = {

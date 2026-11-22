@@ -9,6 +9,7 @@ import { adminChangePin, adminSaveSettings } from "@/lib/admin.functions";
 import { getPublicData } from "@/lib/public.functions";
 import type { SiteSettings } from "@/lib/site";
 import { Field, Panel, goldBtn, inputLux } from "./ui";
+import { ReplaceCardPanel } from "./ReplaceCardPanel";
 import { reportError, useAdmin } from "./admin-context";
 
 const FIELDS: { key: keyof SiteSettings; label: string; hint?: string; long?: boolean }[] = [
@@ -76,9 +77,10 @@ export function SettingsTab() {
 
   return (
     <div className="space-y-6">
+      <ReplaceCardPanel currentUrl={data.cardImageUrl} />
       <Panel
         title="Visiting Card & Site Settings"
-        subtitle="Changes update the live card and the downloadable PNG"
+        subtitle={data.cardImageUrl ? "These details are used for Save Contact and WhatsApp. The designed card shows again if you remove the uploaded one." : "Changes update the live card and the downloadable PNG"}
         icon={<IdCard className="size-5" />}
       >
         <div className="mb-6">
