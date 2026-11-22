@@ -32,8 +32,16 @@ export type PublicData = { settings: SiteSettings; posts: Post[] };
 export const getPublicData = createServerFn({ method: "GET" }).handler(
   async (): Promise<PublicData> => {
     const sb = publicClient();
+    // site_settings has no anon grant: read only the public card fields with the server key.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const [s, p] = await Promise.all([
-      sb.from("site_settings").select("*").eq("id", 1).maybeSingle(),
+      supabaseAdmin
+        .from("site_settings")
+        .select(
+          "devotional_header, business_name, proprietor_name, experience_text, services_text, call_number, whatsapp_number, address",
+        )
+        .eq("id", 1)
+        .maybeSingle(),
       sb
         .from("posts")
         .select("*")
