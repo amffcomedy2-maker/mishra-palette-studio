@@ -137,6 +137,7 @@ export type Database = {
           title: string
           updated_at: string
           video_url: string | null
+          volume: number
         }
         Insert: {
           category?: string
@@ -152,6 +153,7 @@ export type Database = {
           title: string
           updated_at?: string
           video_url?: string | null
+          volume?: number
         }
         Update: {
           category?: string
@@ -167,6 +169,7 @@ export type Database = {
           title?: string
           updated_at?: string
           video_url?: string | null
+          volume?: number
         }
         Relationships: []
       }
@@ -182,6 +185,7 @@ export type Database = {
           proprietor_name: string
           services_text: string
           updated_at: string
+          watermark_text: string
           whatsapp_number: string
         }
         Insert: {
@@ -195,6 +199,7 @@ export type Database = {
           proprietor_name?: string
           services_text?: string
           updated_at?: string
+          watermark_text?: string
           whatsapp_number?: string
         }
         Update: {
@@ -208,6 +213,7 @@ export type Database = {
           proprietor_name?: string
           services_text?: string
           updated_at?: string
+          watermark_text?: string
           whatsapp_number?: string
         }
         Relationships: []

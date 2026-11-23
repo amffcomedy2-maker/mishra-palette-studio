@@ -40,7 +40,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { adminDeletePost, adminListPosts, adminUpdatePost } from "@/lib/admin.functions";
-import { CATEGORIES, type Category, type Orientation, type Post } from "@/lib/site";
+import {
+  CATEGORIES,
+  facebookVideoHref,
+  type Category,
+  type Orientation,
+  type Post,
+} from "@/lib/site";
+import { InlineVolume } from "./VolumeControl";
 import { Field, Panel, glassBtn, goldBtn, inputLux } from "./ui";
 import { reportError, useAdmin } from "./admin-context";
 
@@ -69,6 +76,19 @@ export function ManagePostsTab() {
     try {
       await adminUpdatePost({ data: { token, id: p.id, patch: { is_visible: v } } });
       toast.success(v ? "Now visible on website" : "Hidden from website");
+      await refresh();
+    } catch (e) {
+      reportError(e, logout);
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function saveVolume(p: Post, volume: number) {
+    setSavingId(p.id);
+    try {
+      await adminUpdatePost({ data: { token, id: p.id, patch: { volume } } });
+      toast.success(volume === 0 ? "Muted on website" : `Volume set to ${volume}%`);
       await refresh();
     } catch (e) {
       reportError(e, logout);
@@ -164,6 +184,13 @@ export function ManagePostsTab() {
                     </span>
                   )}
                 </div>
+                {(p.kind === "video" || facebookVideoHref(p.embed_url)) && (
+                  <InlineVolume
+                    value={p.volume ?? 100}
+                    saving={savingId === p.id}
+                    onSave={(v) => void saveVolume(p, v)}
+                  />
+                )}
               </div>
               <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground">

@@ -4,7 +4,8 @@ import { Download, Loader2, Phone, UserPlus } from "lucide-react";
 import { VisitingCard } from "./VisitingCard";
 import { WhatsAppIcon } from "./icons";
 import { useTilt } from "./motion";
-import { useT } from "@/lib/i18n";
+import { useLanguage, useT } from "@/lib/i18n";
+import { downloadBlob } from "@/lib/download";
 import {
   buildVCard,
   defaultEnquiryMessage,
@@ -13,18 +14,6 @@ import {
   type SiteSettings,
 } from "@/lib/site";
 import { cn } from "@/lib/utils";
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.rel = "noopener";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
-}
 
 const actionBase =
   "btn-3d inline-flex h-13 items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-3 text-sm font-bold sm:text-[15px]";
@@ -37,6 +26,7 @@ export function CardHero({
   cardImageUrl: string | null;
 }) {
   const t = useT();
+  const { lang } = useLanguage();
   const cardRef = useRef<HTMLDivElement>(null);
   const tilt = useTilt<HTMLDivElement>(6);
   const [busy, setBusy] = useState(false);
@@ -114,6 +104,12 @@ export function CardHero({
           <div className="tilt-glare pointer-events-none absolute inset-0 rounded-[22px] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
           <div className="animate-sheen pointer-events-none absolute inset-0 rounded-[22px]" />
         </div>
+        {cardImageUrl && lang !== "orig" && settings.services_text && (
+          // The uploaded card is a picture, so its "contact us" paragraph is repeated as translatable text.
+          <p className="glass font-hindi mt-4 rounded-2xl px-5 py-4 text-center text-[15px] leading-relaxed text-foreground animate-in fade-in">
+            {t(settings.services_text)}
+          </p>
+        )}
       </div>
 
       <div className="mt-8 grid grid-cols-2 gap-3">

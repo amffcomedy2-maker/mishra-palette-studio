@@ -21,7 +21,10 @@ export type SiteSettings = {
   call_number: string;
   whatsapp_number: string;
   address: string;
+  watermark_text: string;
 };
+
+export const DEFAULT_WATERMARK = "painter.rf.gd";
 
 export const DEFAULT_SETTINGS: SiteSettings = {
   devotional_header: "जय श्री श्याम",
@@ -33,6 +36,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   call_number: "9217672275",
   whatsapp_number: "7488650236",
   address: "Sector 105, Gurgaon",
+  watermark_text: DEFAULT_WATERMARK,
 };
 
 export type PostKind = "photo" | "facebook" | "video";
@@ -50,6 +54,8 @@ export type Post = {
   video_url: string | null;
   orientation: Orientation;
   is_visible: boolean;
+  /** Playback volume set by the admin, 0–100. */
+  volume: number;
   created_at: string;
 };
 
@@ -271,7 +277,8 @@ export function parseFacebookInput(input: string): FacebookEmbed | null {
   else if (/(^|\.)facebook\.com$/i.test(u.hostname)) u.hostname = "www.facebook.com";
   u.protocol = "https:";
   const isVideo = isVideoPath(u);
-  const isReel = /\/(reel|reels|share\/r)(\/|$)/i.test(u.pathname) || u.hostname.endsWith("fb.watch");
+  const isReel =
+    /\/(reel|reels|share\/r)(\/|$)/i.test(u.pathname) || u.hostname.endsWith("fb.watch");
   const href = encodeURIComponent(u.toString());
   const embedUrl = isVideo
     ? `https://www.facebook.com/plugins/video.php?href=${href}&show_text=false&width=560&t=0`
@@ -305,6 +312,80 @@ export function cloudinaryPoster(videoUrl: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/** The reel/video URL inside a stored video.php embed, for Facebook's video player SDK. */
+export function facebookVideoHref(embedUrl: string | null): string | null {
+  if (!embedUrl || !isFacebookEmbedUrl(embedUrl)) return null;
+  const u = new URL(embedUrl);
+  if (!u.pathname.includes("/plugins/video.php")) return null;
+  const href = u.searchParams.get("href");
+  if (!href) return null;
+  try {
+    const h = new URL(href);
+    return isFacebookHost(h.hostname) ? h.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Admin volume (0–100) as a 0–1 player volume. */
+export function volumeFraction(volume: number | null | undefined): number {
+  const v = typeof volume === "number" && Number.isFinite(volume) ? volume : 100;
+  return Math.min(100, Math.max(0, Math.round(v))) / 100;
+}
+
+/** A filename-safe version of a work title, e.g. "Wall Texture Bedroom" -> "Wall-Texture-Bedroom". */
+export function safeFileName(title: string, fallback = "Mishra-Painters"): string {
+  const s = (title || "")
+    .normalize("NFKD")
+    .replace(/[^A-Za-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  return s || fallback;
+}
+
+/** Escapes text for a Cloudinary l_text overlay (commas and slashes are double-escaped). */
+export function cloudinaryOverlayText(text: string): string {
+  return encodeURIComponent(text)
+    .replace(/%2C/gi, "%252C")
+    .replace(/%2F/gi, "%252F")
+    .replace(/\(/g, "%28")
+    .replace(/\)/g, "%29");
+}
+
+/**
+ * Download link for a Cloudinary video with the watermark burned into the bottom-left corner
+ * (Cloudinary renders it on its servers). Null for videos not hosted on Cloudinary.
+ */
+export function cloudinaryDownloadUrl(
+  videoUrl: string | null,
+  watermark: string,
+  fileName: string,
+): string | null {
+  if (!videoUrl) return null;
+  let u: URL;
+  try {
+    u = new URL(videoUrl);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "https:" || !u.hostname.endsWith("res.cloudinary.com")) return null;
+  const marker = "/video/upload/";
+  const at = u.pathname.indexOf(marker);
+  if (at < 0) return null;
+  const text = (watermark || DEFAULT_WATERMARK).trim().slice(0, 60) || DEFAULT_WATERMARK;
+  // Watermark width grows with the text length, relative to the video width.
+  const ratio = Math.min(0.7, Math.max(0.2, text.length * 0.03)).toFixed(2);
+  const layer = [
+    `l_text:Arial_80_bold_stroke:${cloudinaryOverlayText(text)},co_white,bo_6px_solid_black,o_85`,
+    `c_scale,fl_relative,w_${ratio}`,
+    "fl_layer_apply,g_south_west,x_0.04,y_0.03",
+    `fl_attachment:${safeFileName(fileName)}`,
+  ].join("/");
+  const head = u.pathname.slice(0, at + marker.length);
+  const rest = u.pathname.slice(at + marker.length);
+  return `${u.origin}${head}${layer}/${rest}`;
 }
 
 /* ---------------- API integrations ---------------- */

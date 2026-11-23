@@ -41,3 +41,7 @@ use the editor.
 - An uploaded visiting card (`site_settings.card_image_url`, ImgBB via `/api/admin/upload-card`) fully replaces the designed card publicly, including the download; null restores the designed card.
 - ImgBB connection tests must upload at least a 16x16 image: ImgBB answers 1x1 images with "You have been forbidden to use this website."
 - No `attachSupabaseAuth` in `src/start.ts` and no generated browser Supabase client on public pages: both read localStorage, which throws when storage is blocked (iframes/private mode) and blanks the site; realtime uses the storage-free `getRealtimeClient()`.
+- Facebook reel/video posts (`video.php` embeds) play through Facebook's JS SDK (`fb-video` + Embedded Video Player API in `src/lib/fb-sdk.ts`): `finishedPlaying` covers Facebook's "up next" screen and the API allows pause/volume; the stored iframe src is the fallback when the SDK is blocked.
+- Only one public video plays at a time: every player registers with `src/lib/media-bus.ts` and calls `claimPlayback` on play.
+- Visitor downloads carry `site_settings.watermark_text` bottom-left: photos are redrawn on a canvas in the browser (ImgBB allows CORS), Cloudinary videos use an `l_text` overlay URL with `fl_attachment` (`cloudinaryDownloadUrl`); Facebook and non-Cloudinary videos get no download button.
+- Per-post `posts.volume` (0–100) is applied by the public players; iPhone ignores non-zero video volume, only mute works there.

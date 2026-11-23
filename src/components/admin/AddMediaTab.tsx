@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
+import { VolumeField } from "./VolumeControl";
 import {
   Select,
   SelectContent,
@@ -51,6 +52,7 @@ export function AddMediaTab({ cloudinaryCount }: { cloudinaryCount: number | und
   const [category, setCategory] = useState<Category>(CATEGORIES[0]);
   const [note, setNote] = useState("");
   const [orientation, setOrientation] = useState<Orientation | "auto">("auto");
+  const [volume, setVolume] = useState(100);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -165,6 +167,7 @@ export function AddMediaTab({ cloudinaryCount }: { cloudinaryCount: number | und
               embed_url: parsed.embedUrl,
               source_url: parsed.sourceUrl,
               orientation: fbOrientation,
+              volume,
             },
           },
         });
@@ -181,6 +184,7 @@ export function AddMediaTab({ cloudinaryCount }: { cloudinaryCount: number | und
               note: note.trim() || undefined,
               video_url: videoUrl.trim(),
               orientation: finalOrientation,
+              volume,
             },
           },
         });
@@ -191,6 +195,7 @@ export function AddMediaTab({ cloudinaryCount }: { cloudinaryCount: number | und
       setTitle("");
       setNote("");
       setOrientation("auto");
+      setVolume(100);
       void qc.invalidateQueries({ queryKey: ["admin", "posts"] });
     } catch (e) {
       reportError(e, logout);
@@ -356,6 +361,9 @@ export function AddMediaTab({ cloudinaryCount }: { cloudinaryCount: number | und
             </SelectContent>
           </Select>
         </Field>
+        {(mode === "video" || !fb || fb.isVideo) && (
+          <VolumeField value={volume} onChange={setVolume} />
+        )}
         <Field label="Short note (optional)">
           <Textarea
             value={note}

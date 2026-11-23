@@ -59,7 +59,8 @@ export function ReplaceCardPanel({ currentUrl }: { currentUrl: string | null }) 
       }
       if (res.status >= 400) throw new Error(json.error || "Upload failed");
       setProgress(100);
-      if (json.failedKeys?.length) toast.warning(`Primary key failed, used backup "${json.usedKey}".`);
+      if (json.failedKeys?.length)
+        toast.warning(`Primary key failed, used backup "${json.usedKey}".`);
       toast.success("New visiting card is live on the website ✅");
       setFile(null);
       if (fileRef.current) fileRef.current.value = "";
@@ -150,7 +151,11 @@ export function ReplaceCardPanel({ currentUrl }: { currentUrl: string | null }) 
           onClick={() => void replace()}
           className={`${goldBtn} w-full`}
         >
-          {uploading ? <Loader2 className="size-5 animate-spin" /> : <RefreshCcw className="size-5" />}
+          {uploading ? (
+            <Loader2 className="size-5 animate-spin" />
+          ) : (
+            <RefreshCcw className="size-5" />
+          )}
           Replace Visiting Card
         </button>
 
@@ -161,7 +166,11 @@ export function ReplaceCardPanel({ currentUrl }: { currentUrl: string | null }) 
             onClick={() => void restore()}
             className="chip w-full justify-center py-3"
           >
-            {restoring ? <Loader2 className="size-4 animate-spin" /> : <Undo2 className="size-4 text-gold" />}
+            {restoring ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Undo2 className="size-4 text-gold" />
+            )}
             Use the designed card again
           </button>
         )}

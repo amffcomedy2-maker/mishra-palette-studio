@@ -570,3 +570,20 @@
 @utility media-shade {
   background: linear-gradient(180deg, transparent 45%, oklch(0.1 0.025 265 / 75%));
 }
+
+/* Facebook's SDK sizes its player with fixed pixels; stretch it to our card / full screen. */
+.fb-host .fb-video,
+.fb-host .fb-video > span,
+.fb-host iframe {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Window-filling fallback player (iPhone): ancestors must not trap position: fixed. */
+.glass:has([data-pseudo-fs="true"]),
+.lift:has([data-pseudo-fs="true"]),
+.reveal:has([data-pseudo-fs="true"]) {
+  transform: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}

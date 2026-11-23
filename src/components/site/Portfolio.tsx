@@ -1,22 +1,30 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   ChevronLeft,
   ChevronRight,
   Clapperboard,
+  Download,
   Expand,
   Images,
   LayoutGrid,
+  Loader2,
   Sparkles,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { WhatsAppIcon } from "./icons";
+import { MediaPlayer } from "./MediaPlayer";
 import { Reveal } from "./motion";
 import { useT } from "@/lib/i18n";
+import { downloadBlob, downloadUrl } from "@/lib/download";
+import { watermarkedPhoto } from "@/lib/watermark";
 import {
   CATEGORIES,
-  cloudinaryPoster,
+  cloudinaryDownloadUrl,
+  DEFAULT_WATERMARK,
   defaultEnquiryMessage,
+  safeFileName,
   whatsappLink,
   workEnquiryMessage,
   type Post,
@@ -26,11 +34,27 @@ import { cn } from "@/lib/utils";
 
 type Tab = "all" | "photos" | "reels";
 
-const aspect: Record<Post["orientation"], string> = {
-  vertical: "aspect-[9/16]",
-  horizontal: "aspect-video",
-  square: "aspect-[4/5]",
-};
+const smallBtn = "chip h-9 shrink-0 gap-1.5 px-3 text-xs font-bold disabled:opacity-60";
+
+/** Downloads the photo with the watermark drawn bottom-left. */
+function usePhotoDownload(watermark: string, t: (s: string) => string) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  async function download(post: Post) {
+    if (!post.image_url || busyId) return;
+    setBusyId(post.id);
+    try {
+      const blob = await watermarkedPhoto(post.image_url, watermark || DEFAULT_WATERMARK);
+      downloadBlob(blob, `${safeFileName(post.title)}-Mishra-Painters.jpg`);
+      toast.success(t("Photo downloaded!"));
+    } catch (e) {
+      console.error(e);
+      toast.error(t("Could not download the photo. Please try again."));
+    } finally {
+      setBusyId(null);
+    }
+  }
+  return { busyId, download };
+}
 
 function SectionTitle({
   icon,
@@ -55,10 +79,14 @@ function SectionTitle({
 function PhotoCard({
   post,
   onOpen,
+  onDownload,
+  downloading,
   t,
 }: {
   post: Post;
   onOpen: () => void;
+  onDownload: () => void;
+  downloading: boolean;
   t: (s: string) => string;
 }) {
   return (
@@ -85,10 +113,24 @@ function PhotoCard({
         <h3 className="font-serif-lux text-lg font-semibold leading-snug text-foreground">
           {t(post.title)}
         </h3>
-        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+        <div className="mt-1.5 flex items-center justify-between gap-2">
           <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-semibold text-accent-foreground">
             {t(post.category)}
           </span>
+          <button
+            type="button"
+            onClick={onDownload}
+            disabled={downloading}
+            className={smallBtn}
+            aria-label={`${t("Download")} ${post.title}`}
+          >
+            {downloading ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Download className="size-3.5" />
+            )}
+            {t("Download")}
+          </button>
         </div>
         {post.note && (
           <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{t(post.note)}</p>
@@ -98,38 +140,45 @@ function PhotoCard({
   );
 }
 
-function MediaCard({ post, t }: { post: Post; t: (s: string) => string }) {
+function MediaCard({
+  post,
+  watermark,
+  t,
+}: {
+  post: Post;
+  watermark: string;
+  t: (s: string) => string;
+}) {
+  const dl =
+    post.kind === "video"
+      ? cloudinaryDownloadUrl(post.video_url, watermark, `${post.title}-Mishra-Painters`)
+      : null;
   return (
     <article className="lift glass overflow-hidden rounded-2xl">
-      <div className={cn("relative w-full overflow-hidden bg-muted", aspect[post.orientation])}>
-        {post.kind === "facebook" && post.embed_url ? (
-          <iframe
-            src={post.embed_url}
-            title={post.title}
-            loading="lazy"
-            className="absolute inset-0 size-full border-0"
-            scrolling="no"
-            allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-            allowFullScreen
-          />
-        ) : post.video_url ? (
-          <video
-            src={post.video_url}
-            poster={cloudinaryPoster(post.video_url)}
-            controls
-            playsInline
-            preload="metadata"
-            className="absolute inset-0 size-full object-cover"
-          />
-        ) : null}
-      </div>
+      <MediaPlayer post={post} t={t} />
       <div className="border-t border-border px-4 py-3.5">
         <h3 className="font-serif-lux text-lg font-semibold leading-snug text-foreground">
           {t(post.title)}
         </h3>
-        <span className="mt-1.5 inline-block rounded-full bg-accent px-2.5 py-0.5 text-xs font-semibold text-accent-foreground">
-          {t(post.category)}
-        </span>
+        <div className="mt-1.5 flex items-center justify-between gap-2">
+          <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-semibold text-accent-foreground">
+            {t(post.category)}
+          </span>
+          {dl && (
+            <button
+              type="button"
+              onClick={() => {
+                downloadUrl(dl);
+                toast.success(t("Download starting — please wait a few seconds."));
+              }}
+              className={smallBtn}
+              aria-label={`${t("Download")} ${post.title}`}
+            >
+              <Download className="size-3.5" />
+              {t("Download")}
+            </button>
+          )}
+        </div>
         {post.note && (
           <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{t(post.note)}</p>
         )}
@@ -144,6 +193,8 @@ function Lightbox({
   onIndex,
   onClose,
   settings,
+  onDownload,
+  downloadingId,
   t,
 }: {
   photos: Post[];
@@ -151,9 +202,18 @@ function Lightbox({
   onIndex: (i: number) => void;
   onClose: () => void;
   settings: SiteSettings;
+  onDownload: (p: Post) => void;
+  downloadingId: string | null;
   t: (s: string) => string;
 }) {
   const post = index !== null ? photos[index] : undefined;
+  // Prepare the watermarked file while the photo is open so Download is instant.
+  useEffect(() => {
+    if (post?.image_url)
+      void watermarkedPhoto(post.image_url, settings.watermark_text || DEFAULT_WATERMARK).catch(
+        () => {},
+      );
+  }, [post?.image_url, settings.watermark_text]);
   const go = (d: number) =>
     index !== null && photos.length && onIndex((index + d + photos.length) % photos.length);
   return (
@@ -211,18 +271,33 @@ function Lightbox({
                 <Dialog.Description className="mt-2 text-sm text-muted-foreground">
                   {post.note ? t(post.note) : t("Original work by Mishra Painters")}
                 </Dialog.Description>
-                <a
-                  href={whatsappLink(
-                    settings.whatsapp_number,
-                    workEnquiryMessage(settings.proprietor_name, post.title),
-                  )}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-3d btn-whatsapp mt-4 inline-flex h-12 items-center justify-center gap-2 rounded-2xl px-6 font-bold"
-                >
-                  <WhatsAppIcon className="size-5" />
-                  {t("Ask About This Work on WhatsApp")}
-                </a>
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+                  <a
+                    href={whatsappLink(
+                      settings.whatsapp_number,
+                      workEnquiryMessage(settings.proprietor_name, post.title),
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-3d btn-whatsapp inline-flex h-12 items-center justify-center gap-2 rounded-2xl px-6 font-bold"
+                  >
+                    <WhatsAppIcon className="size-5" />
+                    {t("Ask About This Work on WhatsApp")}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => onDownload(post)}
+                    disabled={downloadingId === post.id}
+                    className="btn-3d btn-glass inline-flex h-12 items-center justify-center gap-2 rounded-2xl px-6 font-bold"
+                  >
+                    {downloadingId === post.id ? (
+                      <Loader2 className="size-5 animate-spin" />
+                    ) : (
+                      <Download className="size-5 text-gold" />
+                    )}
+                    {t("Download Photo")}
+                  </button>
+                </div>
               </div>
             </>
           )}
@@ -245,6 +320,7 @@ export function Portfolio({
   const [tab, setTab] = useState<Tab>("all");
   const [cat, setCat] = useState<string>("all");
   const [open, setOpen] = useState<number | null>(null);
+  const photoDl = usePhotoDownload(settings.watermark_text, t);
 
   const filtered = useMemo(
     () => posts.filter((p) => cat === "all" || p.category === cat),
@@ -357,7 +433,13 @@ export function Portfolio({
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {photos.map((p, i) => (
                   <Reveal key={p.id} delay={(i % 3) * 80}>
-                    <PhotoCard post={p} t={t} onOpen={() => setOpen(i)} />
+                    <PhotoCard
+                      post={p}
+                      t={t}
+                      onOpen={() => setOpen(i)}
+                      onDownload={() => void photoDl.download(p)}
+                      downloading={photoDl.busyId === p.id}
+                    />
                   </Reveal>
                 ))}
               </div>
@@ -383,7 +465,7 @@ export function Portfolio({
                     )}
                   >
                     <Reveal delay={(i % 4) * 70}>
-                      <MediaCard post={p} t={t} />
+                      <MediaCard post={p} watermark={settings.watermark_text} t={t} />
                     </Reveal>
                   </div>
                 ))}
@@ -399,6 +481,8 @@ export function Portfolio({
         onIndex={setOpen}
         onClose={() => setOpen(null)}
         settings={settings}
+        onDownload={(p) => void photoDl.download(p)}
+        downloadingId={photoDl.busyId}
         t={t}
       />
     </section>

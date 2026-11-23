@@ -25,6 +25,11 @@ const FIELDS: { key: keyof SiteSettings; label: string; hint?: string; long?: bo
   { key: "call_number", label: "Calling number" },
   { key: "whatsapp_number", label: "WhatsApp number" },
   { key: "address", label: "Address" },
+  {
+    key: "watermark_text",
+    label: "Download watermark",
+    hint: "Printed bottom-left on photos and videos visitors download, e.g. painter.rf.gd",
+  },
 ];
 
 export function SettingsTab() {
@@ -80,7 +85,11 @@ export function SettingsTab() {
       <ReplaceCardPanel currentUrl={data.cardImageUrl} />
       <Panel
         title="Visiting Card & Site Settings"
-        subtitle={data.cardImageUrl ? "These details are used for Save Contact and WhatsApp. The designed card shows again if you remove the uploaded one." : "Changes update the live card and the downloadable PNG"}
+        subtitle={
+          data.cardImageUrl
+            ? "These details are used for Save Contact and WhatsApp. The designed card shows again if you remove the uploaded one."
+            : "Changes update the live card and the downloadable PNG"
+        }
         icon={<IdCard className="size-5" />}
       >
         <div className="mb-6">
@@ -108,7 +117,7 @@ export function SettingsTab() {
                   onChange={(e) => setS({ ...s, [f.key]: e.target.value })}
                   className={inputLux}
                   inputMode={f.key.endsWith("number") ? "tel" : undefined}
-                  maxLength={f.key === "address" ? 160 : 80}
+                  maxLength={f.key === "address" ? 160 : f.key === "watermark_text" ? 60 : 80}
                 />
               )}
             </Field>

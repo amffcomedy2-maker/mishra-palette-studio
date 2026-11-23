@@ -38,7 +38,7 @@ export const getPublicData = createServerFn({ method: "GET" }).handler(
       supabaseAdmin
         .from("site_settings")
         .select(
-          "devotional_header, business_name, proprietor_name, experience_text, services_text, call_number, whatsapp_number, address, card_image_url",
+          "devotional_header, business_name, proprietor_name, experience_text, services_text, call_number, whatsapp_number, address, card_image_url, watermark_text",
         )
         .eq("id", 1)
         .maybeSingle(),
@@ -62,6 +62,7 @@ export const getPublicData = createServerFn({ method: "GET" }).handler(
           call_number: row.call_number,
           whatsapp_number: row.whatsapp_number,
           address: row.address,
+          watermark_text: row.watermark_text || DEFAULT_SETTINGS.watermark_text,
         }
       : DEFAULT_SETTINGS;
     return { settings, posts: (p.data ?? []) as Post[], cardImageUrl: row?.card_image_url ?? null };

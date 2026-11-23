@@ -6,6 +6,7 @@ const token = z.string().min(10).max(2000);
 const orientation = z.enum(["vertical", "horizontal", "square"]);
 const category = z.enum(CATEGORIES);
 const service = z.enum(["imgbb", "cloudinary", "gemini", "custom"]);
+const volume = z.number().int().min(0).max(100);
 
 /** Drops undefined keys so partial updates satisfy exactOptionalPropertyTypes. */
 function defined<T extends object>(o: T): { [K in keyof T]?: Exclude<T[K], undefined> } {
@@ -89,6 +90,7 @@ const settingsShape = z.object({
     .trim()
     .regex(/^[+\d\s-]{10,16}$/, "Enter a valid phone number"),
   address: z.string().trim().min(1).max(160),
+  watermark_text: z.string().trim().min(1, "Watermark can't be empty").max(60),
 });
 
 export const adminSaveSettings = createServerFn({ method: "POST" })
@@ -139,6 +141,7 @@ const createMedia = z.discriminatedUnion("kind", [
     embed_url: z.string().url().refine(isFacebookEmbedUrl, "Not a valid Facebook embed"),
     source_url: z.string().url().max(2000),
     orientation,
+    volume: volume.default(100),
   }),
   z.object({
     kind: z.literal("video"),
@@ -151,6 +154,7 @@ const createMedia = z.discriminatedUnion("kind", [
       .max(2000)
       .refine((u) => u.startsWith("https://"), "Video link must start with https://"),
     orientation,
+    volume: volume.default(100),
   }),
 ]);
 
@@ -186,6 +190,7 @@ export const adminUpdatePost = createServerFn({ method: "POST" })
           note: z.string().trim().max(400).nullable().optional(),
           orientation: orientation.optional(),
           is_visible: z.boolean().optional(),
+          volume: volume.optional(),
         }),
       })
       .parse(i),
