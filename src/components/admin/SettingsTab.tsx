@@ -7,12 +7,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { VisitingCard } from "@/components/site/VisitingCard";
 import { adminChangePin, adminSaveSettings } from "@/lib/admin.functions";
 import { getPublicData } from "@/lib/public.functions";
-import type { SiteSettings } from "@/lib/site";
+import type { SiteSettings, TextSettingKey } from "@/lib/site";
 import { Field, Panel, goldBtn, inputLux } from "./ui";
 import { ReplaceCardPanel } from "./ReplaceCardPanel";
 import { reportError, useAdmin } from "./admin-context";
 
-const FIELDS: { key: keyof SiteSettings; label: string; hint?: string; long?: boolean }[] = [
+const FIELDS: { key: TextSettingKey; label: string; hint?: string; long?: boolean }[] = [
   {
     key: "devotional_header",
     label: "Devotional header",
