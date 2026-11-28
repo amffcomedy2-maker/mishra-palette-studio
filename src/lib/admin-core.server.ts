@@ -3,7 +3,14 @@
 import { getRequestHeader } from "@tanstack/react-start/server";
 import { generateChatCompletion } from "@lovable.dev/ai-gateway";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { DEFAULT_PIN, orderActiveIntegrations, type ServiceType } from "@/lib/site";
+import {
+  DEFAULT_PIN,
+  IMAGE_HOST_LABELS,
+  imageHostOrder,
+  orderActiveIntegrations,
+  type ImageHost,
+  type ServiceType,
+} from "@/lib/site";
 
 const enc = new TextEncoder();
 
@@ -224,6 +231,83 @@ export async function uploadToImgbb(
     }
   }
   throw new UserError(`Upload failed on all ImgBB keys. ${failed.join(" | ")}`);
+}
+
+/* ---------- Cloudinary photos with failover ---------- */
+
+export async function uploadToCloudinaryImage(
+  file: Blob,
+  filename: string,
+): Promise<{ url: string; label: string; failed: string[] }> {
+  const list = (await activeIntegrations("cloudinary")).filter(
+    (i) => i.config.cloud_name && ((i.config.api_key && i.config.api_secret) || i.config.upload_preset),
+  );
+  if (!list.length)
+    throw new UserError("No active Cloudinary account found. Please add one in the API Manager tab.");
+  const failed: string[] = [];
+  for (const it of list) {
+    try {
+      const cfg = it.config;
+      const fd = new FormData();
+      fd.append("file", file, filename);
+      if (cfg.api_key && cfg.api_secret) {
+        const timestamp = String(Math.floor(Date.now() / 1000));
+        const folder = "mishra-painters";
+        fd.append("api_key", cfg.api_key);
+        fd.append("timestamp", timestamp);
+        fd.append("folder", folder);
+        fd.append("signature", await sha1Hex(`folder=${folder}&timestamp=${timestamp}${cfg.api_secret}`));
+      } else {
+        fd.append("upload_preset", cfg.upload_preset!);
+      }
+      const res = await fetch(
+        `https://api.cloudinary.com/v1_1/${encodeURIComponent(cfg.cloud_name!)}/image/upload`,
+        { method: "POST", body: fd, signal: AbortSignal.timeout(60000) },
+      );
+      const json = (await res.json().catch(() => null)) as {
+        secure_url?: string;
+        error?: { message?: string };
+      } | null;
+      if (res.ok && json?.secure_url) return { url: json.secure_url, label: it.label, failed };
+      failed.push(`${it.label}: ${json?.error?.message ?? `HTTP ${res.status}`}`);
+    } catch (e) {
+      failed.push(`${it.label}: ${e instanceof Error ? e.message : "network error"}`);
+    }
+  }
+  throw new UserError(`Upload failed on all Cloudinary accounts. ${failed.join(" | ")}`);
+}
+
+/* ---------- Photo upload: the admin's chosen host first, the other as backup ---------- */
+
+export async function getImageHost(): Promise<ImageHost> {
+  const { data } = await supabaseAdmin
+    .from("site_settings")
+    .select("image_host")
+    .eq("id", 1)
+    .maybeSingle();
+  return data?.image_host === "cloudinary" ? "cloudinary" : "imgbb";
+}
+
+export async function uploadImage(
+  file: Blob,
+  filename: string,
+): Promise<{ url: string; label: string; host: ImageHost; failed: string[] }> {
+  const failed: string[] = [];
+  for (const host of imageHostOrder(await getImageHost())) {
+    try {
+      const up =
+        host === "imgbb"
+          ? await uploadToImgbb(file, filename)
+          : await uploadToCloudinaryImage(file, filename);
+      return { url: up.url, label: up.label, host, failed: [...failed, ...up.failed] };
+    } catch (e) {
+      failed.push(
+        `${IMAGE_HOST_LABELS[host]}: ${e instanceof UserError ? e.message : "upload failed"}`,
+      );
+      if (!(e instanceof UserError)) console.error("image upload failed", host, e);
+    }
+  }
+  throw new UserError(`Photo could not be saved anywhere. ${failed.join(" — ")}`);
 }
 
 // 32x32 test picture: ImgBB rejects 1x1 images with "You have been forbidden to use this website."

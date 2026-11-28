@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 const MAX_BYTES = 32 * 1024 * 1024;
 
-// Receives a new visiting card picture, uploads it to ImgBB (with key failover) and makes it live.
+// Receives a new visiting card picture, uploads it to the chosen photo host (with failover) and makes it live.
 export const Route = createFileRoute("/api/admin/upload-card")({
   server: {
     handlers: {
@@ -20,14 +20,14 @@ export const Route = createFileRoute("/api/admin/upload-card")({
           if (file.size > MAX_BYTES)
             return Response.json({ error: "Picture is larger than 32 MB." }, { status: 400 });
 
-          const uploaded = await c.uploadToImgbb(file, file.name || "visiting-card.jpg");
+          const uploaded = await c.uploadImage(file, file.name || "visiting-card.jpg");
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const { error } = await supabaseAdmin
             .from("site_settings")
             .update({ card_image_url: uploaded.url, updated_at: new Date().toISOString() })
             .eq("id", 1);
           if (error) throw new Error(error.message);
-          return Response.json({ url: uploaded.url, usedKey: uploaded.label, failedKeys: uploaded.failed });
+          return Response.json({ url: uploaded.url, usedKey: uploaded.label, host: uploaded.host, failedKeys: uploaded.failed });
         } catch (e) {
           if (e instanceof c.UserError) {
             const status = e.message === "SESSION_EXPIRED" ? 401 : 400;

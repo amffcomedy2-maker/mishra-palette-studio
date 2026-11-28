@@ -83,6 +83,80 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          sender: string
+          thread_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          sender: string
+          thread_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          sender?: string
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_threads: {
+        Row: {
+          admin_unread: number
+          created_at: string
+          id: string
+          ip_hash: string | null
+          last_message_at: string
+          last_preview: string
+          last_sender: string
+          secret_hash: string
+          visitor_name: string
+          visitor_phone: string | null
+          visitor_unread: number
+        }
+        Insert: {
+          admin_unread?: number
+          created_at?: string
+          id?: string
+          ip_hash?: string | null
+          last_message_at?: string
+          last_preview?: string
+          last_sender?: string
+          secret_hash: string
+          visitor_name: string
+          visitor_phone?: string | null
+          visitor_unread?: number
+        }
+        Update: {
+          admin_unread?: number
+          created_at?: string
+          id?: string
+          ip_hash?: string | null
+          last_message_at?: string
+          last_preview?: string
+          last_sender?: string
+          secret_hash?: string
+          visitor_name?: string
+          visitor_phone?: string | null
+          visitor_unread?: number
+        }
+        Relationships: []
+      }
       content_version: {
         Row: {
           id: number
@@ -179,11 +253,15 @@ export type Database = {
           business_name: string
           call_number: string
           card_image_url: string | null
+          chat_enabled: boolean
           devotional_header: string
           experience_text: string
           id: number
+          image_host: string
           proprietor_name: string
           services_text: string
+          show_call: boolean
+          show_whatsapp: boolean
           updated_at: string
           watermark_text: string
           whatsapp_number: string
@@ -193,11 +271,15 @@ export type Database = {
           business_name?: string
           call_number?: string
           card_image_url?: string | null
+          chat_enabled?: boolean
           devotional_header?: string
           experience_text?: string
           id?: number
+          image_host?: string
           proprietor_name?: string
           services_text?: string
+          show_call?: boolean
+          show_whatsapp?: boolean
           updated_at?: string
           watermark_text?: string
           whatsapp_number?: string
@@ -207,11 +289,15 @@ export type Database = {
           business_name?: string
           call_number?: string
           card_image_url?: string | null
+          chat_enabled?: boolean
           devotional_header?: string
           experience_text?: string
           id?: number
+          image_host?: string
           proprietor_name?: string
           services_text?: string
+          show_call?: boolean
+          show_whatsapp?: boolean
           updated_at?: string
           watermark_text?: string
           whatsapp_number?: string

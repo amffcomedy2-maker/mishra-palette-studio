@@ -36,6 +36,13 @@
       "when": 1795439771626,
       "tag": "0004_add_post_volume_and_watermark",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795839226919,
+      "tag": "0005_contact_toggles_image_host_private_chat",
+      "breakpoints": true
     }
   ]
 }

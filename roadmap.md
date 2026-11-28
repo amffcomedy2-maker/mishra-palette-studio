@@ -10,3 +10,8 @@
 - [x] Playing one video pauses any other playing video
 - [x] Admin: per-post volume for reels/videos
 - [x] Language switch translates the "contact us" paragraph when an uploaded card is shown
+- [ ] Photos/videos that fail to load (ImgBB unavailable/blocked, black video): automatic backup route + retry
+- [ ] Some visitors can't open the site: investigate (painter.rf.gd free host drops connections)
+- [ ] Admin can hide the call number/button and the WhatsApp number/button
+- [ ] Admin chooses where photos are stored (ImgBB or Cloudinary), with automatic fallback
+- [ ] Private chat: visitors message the admin; admin reads/replies/deletes chats in the admin panel

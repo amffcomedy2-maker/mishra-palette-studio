@@ -1,6 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { CATEGORIES, isFacebookEmbedUrl, maskSecret, type Post } from "@/lib/site";
+import { CHAT_LIMITS, type ChatMessage, type ChatThread } from "@/lib/chat";
+import {
+  CATEGORIES,
+  DEFAULT_SETTINGS,
+  isFacebookEmbedUrl,
+  maskSecret,
+  type ImageHost,
+  type Post,
+  type SiteSettings,
+} from "@/lib/site";
 
 const token = z.string().min(10).max(2000);
 const orientation = z.enum(["vertical", "horizontal", "square"]);
@@ -91,7 +100,55 @@ const settingsShape = z.object({
     .regex(/^[+\d\s-]{10,16}$/, "Enter a valid phone number"),
   address: z.string().trim().min(1).max(160),
   watermark_text: z.string().trim().min(1, "Watermark can't be empty").max(60),
+  show_call: z.boolean(),
+  show_whatsapp: z.boolean(),
+  chat_enabled: z.boolean(),
 });
+
+/** Full settings for the admin form (the public page never receives a hidden number). */
+export const adminGetSettings = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ token }).parse(i))
+  .handler(async ({ data }): Promise<SiteSettings> => {
+    const c = await core();
+    try {
+      await c.requireAdmin(data.token);
+      const sb = await admin();
+      const { data: row, error } = await sb
+        .from("site_settings")
+        .select(
+          "devotional_header, business_name, proprietor_name, experience_text, services_text, call_number, whatsapp_number, address, watermark_text, show_call, show_whatsapp, chat_enabled",
+        )
+        .eq("id", 1)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return row
+        ? { ...row, watermark_text: row.watermark_text || DEFAULT_SETTINGS.watermark_text }
+        : DEFAULT_SETTINGS;
+    } catch (e) {
+      fail(e, c.UserError);
+    }
+  });
+
+/** Where new photos are stored first; the other host is the automatic backup. */
+export const adminSetImageHost = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ token, host: z.enum(["imgbb", "cloudinary"]) }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const c = await core();
+    try {
+      await c.requireAdmin(data.token);
+      const sb = await admin();
+      const { error } = await sb
+        .from("site_settings")
+        .update({ image_host: data.host })
+        .eq("id", 1);
+      if (error) throw new Error(error.message);
+      return { ok: true };
+    } catch (e) {
+      fail(e, c.UserError);
+    }
+  });
 
 export const adminSaveSettings = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ token, settings: settingsShape }).parse(i))
@@ -537,12 +594,104 @@ export const adminOverview = createServerFn({ method: "POST" })
     const c = await core();
     try {
       await c.requireAdmin(data.token);
-      const [imgbb, cloudinary, gemini] = await Promise.all([
+      const sb = await admin();
+      const [imgbb, cloudinary, gemini, imageHost, unread] = await Promise.all([
         c.activeIntegrations("imgbb"),
         c.activeIntegrations("cloudinary"),
         c.activeIntegrations("gemini"),
+        c.getImageHost(),
+        sb.from("chat_threads").select("id", { count: "exact", head: true }).gt("admin_unread", 0),
       ]);
-      return { imgbb: imgbb.length, cloudinary: cloudinary.length, gemini: gemini.length };
+      return {
+        imgbb: imgbb.length,
+        cloudinary: cloudinary.length,
+        gemini: gemini.length,
+        imageHost: imageHost as ImageHost,
+        unreadChats: unread.count ?? 0,
+      };
+    } catch (e) {
+      fail(e, c.UserError);
+    }
+  });
+
+/* ---------- Private chat ---------- */
+
+export const adminChatThreads = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ token }).parse(i))
+  .handler(async ({ data }): Promise<ChatThread[]> => {
+    const c = await core();
+    try {
+      await c.requireAdmin(data.token);
+      const sb = await admin();
+      const { data: rows, error } = await sb
+        .from("chat_threads")
+        .select(
+          "id, visitor_name, visitor_phone, last_preview, last_sender, admin_unread, created_at, last_message_at",
+        )
+        .order("last_message_at", { ascending: false })
+        .limit(300);
+      if (error) throw new Error(error.message);
+      return (rows ?? []) as ChatThread[];
+    } catch (e) {
+      fail(e, c.UserError);
+    }
+  });
+
+/** Messages of one conversation; opening it marks it as read. */
+export const adminChatMessages = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ token, threadId: z.string().uuid() }).parse(i))
+  .handler(async ({ data }): Promise<ChatMessage[]> => {
+    const c = await core();
+    try {
+      await c.requireAdmin(data.token);
+      const sb = await admin();
+      const { listMessages } = await import("@/lib/chat-core.server");
+      const messages = await listMessages(data.threadId);
+      await sb.from("chat_threads").update({ admin_unread: 0 }).eq("id", data.threadId);
+      return messages;
+    } catch (e) {
+      fail(e, c.UserError);
+    }
+  });
+
+export const adminChatReply = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        token,
+        threadId: z.string().uuid(),
+        body: z.string().trim().min(1).max(CHAT_LIMITS.messageLength),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const c = await core();
+    try {
+      await c.requireAdmin(data.token);
+      const sb = await admin();
+      const { error } = await sb
+        .from("chat_messages")
+        .insert({ thread_id: data.threadId, sender: "admin", body: data.body });
+      if (error)
+        throw error.code === "23503"
+          ? new c.UserError("This chat was deleted.")
+          : new Error(error.message);
+      return { ok: true };
+    } catch (e) {
+      fail(e, c.UserError);
+    }
+  });
+
+export const adminChatDelete = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ token, threadId: z.string().uuid() }).parse(i))
+  .handler(async ({ data }) => {
+    const c = await core();
+    try {
+      await c.requireAdmin(data.token);
+      const sb = await admin();
+      const { error } = await sb.from("chat_threads").delete().eq("id", data.threadId);
+      if (error) throw new Error(error.message);
+      return { ok: true };
     } catch (e) {
       fail(e, c.UserError);
     }

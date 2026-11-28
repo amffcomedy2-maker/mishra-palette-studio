@@ -22,7 +22,30 @@ export type SiteSettings = {
   whatsapp_number: string;
   address: string;
   watermark_text: string;
+  /** False hides the calling number and every Call button. */
+  show_call: boolean;
+  /** False hides the WhatsApp number and every WhatsApp button. */
+  show_whatsapp: boolean;
+  /** False hides the private chat button. */
+  chat_enabled: boolean;
 };
+
+/** The text fields of the settings (everything except the on/off switches). */
+export type TextSettingKey = Exclude<
+  keyof SiteSettings,
+  "show_call" | "show_whatsapp" | "chat_enabled"
+>;
+
+export type ImageHost = "imgbb" | "cloudinary";
+export const IMAGE_HOST_LABELS: Record<ImageHost, string> = {
+  imgbb: "ImgBB",
+  cloudinary: "Cloudinary",
+};
+
+/** Upload order: the admin's chosen host first, the other one as automatic backup. */
+export function imageHostOrder(preferred: ImageHost): ImageHost[] {
+  return preferred === "cloudinary" ? ["cloudinary", "imgbb"] : ["imgbb", "cloudinary"];
+}
 
 export const DEFAULT_WATERMARK = "painter.rf.gd";
 
@@ -37,6 +60,9 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   whatsapp_number: "7488650236",
   address: "Sector 105, Gurgaon",
   watermark_text: DEFAULT_WATERMARK,
+  show_call: true,
+  show_whatsapp: true,
+  chat_enabled: true,
 };
 
 export type PostKind = "photo" | "facebook" | "video";
@@ -106,6 +132,9 @@ export function buildVCard(s: SiteSettings): string {
   const first = parts.length > 1 ? parts.slice(0, -1).join(" ") : name;
   const call = `+${toIntlDigits(s.call_number)}`;
   const wa = `+${toIntlDigits(s.whatsapp_number)}`;
+  const note = [s.show_call ? `Call: ${call}` : "", s.show_whatsapp ? `WhatsApp: ${wa}` : ""]
+    .filter(Boolean)
+    .join(" | ");
   const lines = [
     "BEGIN:VCARD",
     "VERSION:3.0",
@@ -113,11 +142,10 @@ export function buildVCard(s: SiteSettings): string {
     `FN:${vcEscape(`${name} - ${s.business_name}`)}`,
     `ORG:${vcEscape(s.business_name)}`,
     "TITLE:Proprietor",
-    `TEL;TYPE=CELL,VOICE:${call}`,
-    `item1.TEL;TYPE=CELL:${wa}`,
-    "item1.X-ABLabel:WhatsApp",
+    ...(s.show_call ? [`TEL;TYPE=CELL,VOICE:${call}`] : []),
+    ...(s.show_whatsapp ? [`item1.TEL;TYPE=CELL:${wa}`, "item1.X-ABLabel:WhatsApp"] : []),
     `ADR;TYPE=WORK:;;${vcEscape(s.address)};;;;India`,
-    `NOTE:${vcEscape(`Call: ${call} | WhatsApp: ${wa}`)}`,
+    ...(note ? [`NOTE:${vcEscape(note)}`] : []),
     "END:VCARD",
   ];
   return lines.join("\r\n") + "\r\n";
@@ -311,6 +339,41 @@ export function cloudinaryPoster(videoUrl: string): string | undefined {
     return videoUrl.replace(/\.[a-z0-9]+(\?.*)?$/i, ".jpg");
   } catch {
     return undefined;
+  }
+}
+
+/* ---------------- Backup route for photos ---------------- */
+
+/** Photo hosts our own server may fetch on a visitor's behalf when their network blocks the host. */
+export function isProxyableImageUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "https:") return false;
+    const h = u.hostname.toLowerCase();
+    return h === "i.ibb.co" || h === "image.ibb.co" || h === "res.cloudinary.com";
+  } catch {
+    return false;
+  }
+}
+
+/** Same photo served through this website's own address; null when the host is not allowed. */
+export function proxiedImageUrl(url: string | null | undefined): string | null {
+  return url && isProxyableImageUrl(url) ? `/api/public/img?u=${encodeURIComponent(url)}` : null;
+}
+
+/** Cloudinary re-encodes the video to plain H.264 MP4, which every phone can play. */
+export function cloudinaryCompatibleVideo(videoUrl: string | null): string | null {
+  if (!videoUrl) return null;
+  try {
+    const u = new URL(videoUrl);
+    const marker = "/video/upload/";
+    const at = u.pathname.indexOf(marker);
+    if (u.protocol !== "https:" || u.hostname !== "res.cloudinary.com" || at < 0) return null;
+    const rest = u.pathname.slice(at + marker.length).replace(/\.[a-z0-9]+$/i, ".mp4");
+    return `${u.origin}${u.pathname.slice(0, at + marker.length)}f_mp4,vc_h264,ac_aac,q_auto/${rest}`;
+  } catch {
+    return null;
   }
 }
 

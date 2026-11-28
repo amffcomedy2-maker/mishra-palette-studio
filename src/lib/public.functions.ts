@@ -38,7 +38,7 @@ export const getPublicData = createServerFn({ method: "GET" }).handler(
       supabaseAdmin
         .from("site_settings")
         .select(
-          "devotional_header, business_name, proprietor_name, experience_text, services_text, call_number, whatsapp_number, address, card_image_url, watermark_text",
+          "devotional_header, business_name, proprietor_name, experience_text, services_text, call_number, whatsapp_number, address, card_image_url, watermark_text, show_call, show_whatsapp, chat_enabled",
         )
         .eq("id", 1)
         .maybeSingle(),
@@ -59,10 +59,14 @@ export const getPublicData = createServerFn({ method: "GET" }).handler(
           proprietor_name: row.proprietor_name,
           experience_text: row.experience_text,
           services_text: row.services_text,
-          call_number: row.call_number,
-          whatsapp_number: row.whatsapp_number,
+          // A hidden number never leaves the server.
+          call_number: row.show_call ? row.call_number : "",
+          whatsapp_number: row.show_whatsapp ? row.whatsapp_number : "",
           address: row.address,
           watermark_text: row.watermark_text || DEFAULT_SETTINGS.watermark_text,
+          show_call: row.show_call,
+          show_whatsapp: row.show_whatsapp,
+          chat_enabled: row.chat_enabled,
         }
       : DEFAULT_SETTINGS;
     return { settings, posts: (p.data ?? []) as Post[], cardImageUrl: row?.card_image_url ?? null };

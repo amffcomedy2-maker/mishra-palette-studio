@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminMishraRouteImport } from './routes/admin-mishra'
 import { Route as ApiAdminUploadCardRouteImport } from './routes/api/admin/upload-card'
 import { Route as ApiAdminUploadImageRouteImport } from './routes/api/admin/upload-image'
+import { Route as ApiPublicImgRouteImport } from './routes/api/public/img'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,18 +35,25 @@ const ApiAdminUploadImageRoute = ApiAdminUploadImageRouteImport.update({
   path: '/api/admin/upload-image',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicImgRoute = ApiPublicImgRouteImport.update({
+  id: '/api/public/img',
+  path: '/api/public/img',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin-mishra': typeof AdminMishraRoute
   '/api/admin/upload-card': typeof ApiAdminUploadCardRoute
   '/api/admin/upload-image': typeof ApiAdminUploadImageRoute
+  '/api/public/img': typeof ApiPublicImgRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin-mishra': typeof AdminMishraRoute
   '/api/admin/upload-card': typeof ApiAdminUploadCardRoute
   '/api/admin/upload-image': typeof ApiAdminUploadImageRoute
+  '/api/public/img': typeof ApiPublicImgRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,20 +61,30 @@ export interface FileRoutesById {
   '/admin-mishra': typeof AdminMishraRoute
   '/api/admin/upload-card': typeof ApiAdminUploadCardRoute
   '/api/admin/upload-image': typeof ApiAdminUploadImageRoute
+  '/api/public/img': typeof ApiPublicImgRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/admin-mishra' | '/api/admin/upload-card' | '/api/admin/upload-image'
+    | '/'
+    | '/admin-mishra'
+    | '/api/admin/upload-card'
+    | '/api/admin/upload-image'
+    | '/api/public/img'
   fileRoutesByTo: FileRoutesByTo
   to:
-    '/' | '/admin-mishra' | '/api/admin/upload-card' | '/api/admin/upload-image'
+    | '/'
+    | '/admin-mishra'
+    | '/api/admin/upload-card'
+    | '/api/admin/upload-image'
+    | '/api/public/img'
   id:
     | '__root__'
     | '/'
     | '/admin-mishra'
     | '/api/admin/upload-card'
     | '/api/admin/upload-image'
+    | '/api/public/img'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -74,6 +92,7 @@ export interface RootRouteChildren {
   AdminMishraRoute: typeof AdminMishraRoute
   ApiAdminUploadCardRoute: typeof ApiAdminUploadCardRoute
   ApiAdminUploadImageRoute: typeof ApiAdminUploadImageRoute
+  ApiPublicImgRoute: typeof ApiPublicImgRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -106,6 +125,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminUploadImageRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/img': {
+      id: '/api/public/img'
+      path: '/api/public/img'
+      fullPath: '/api/public/img'
+      preLoaderRoute: typeof ApiPublicImgRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -114,6 +140,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminMishraRoute: AdminMishraRoute,
   ApiAdminUploadCardRoute: ApiAdminUploadCardRoute,
   ApiAdminUploadImageRoute: ApiAdminUploadImageRoute,
+  ApiPublicImgRoute: ApiPublicImgRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

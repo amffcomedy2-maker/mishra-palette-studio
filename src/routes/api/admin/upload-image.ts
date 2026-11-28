@@ -10,7 +10,7 @@ const meta = z.object({
   note: z.string().trim().max(400).optional(),
 });
 
-// Receives the admin's photo, uploads it to ImgBB (with key failover) and publishes the post.
+// Receives the admin's photo, uploads it to the chosen photo host (with failover) and publishes the post.
 export const Route = createFileRoute("/api/admin/upload-image")({
   server: {
     handlers: {
@@ -38,7 +38,7 @@ export const Route = createFileRoute("/api/admin/upload-image")({
               { status: 400 },
             );
 
-          const uploaded = await c.uploadToImgbb(file, file.name || "work.jpg");
+          const uploaded = await c.uploadImage(file, file.name || "work.jpg");
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const { data: row, error } = await supabaseAdmin
             .from("posts")
@@ -54,7 +54,7 @@ export const Route = createFileRoute("/api/admin/upload-image")({
             .single();
           if (error) throw new Error(error.message);
           await c.notifyWebhooks("post.published", row);
-          return Response.json({ post: row, usedKey: uploaded.label, failedKeys: uploaded.failed });
+          return Response.json({ post: row, usedKey: uploaded.label, host: uploaded.host, failedKeys: uploaded.failed });
         } catch (e) {
           if (e instanceof c.UserError) {
             const status = e.message === "SESSION_EXPIRED" ? 401 : 400;
